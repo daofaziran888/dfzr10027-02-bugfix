@@ -1,0 +1,818 @@
+{
+  "version": 1,
+  "total_candidates": 42,
+  "qualified": 37,
+  "reserve": 2,
+  "eliminated": 3,
+  "candidates": [
+    {
+      "id": "c01",
+      "topic": "metric_def",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "新增指标自动聚合：从指标定义驱动聚合任务计算，产出API可查询结果",
+      "primary_module": "metric_def",
+      "secondary_modules": [
+        "agg_task",
+        "api_service"
+      ],
+      "data_artifact": "指标计算结果写入 api_service 产物",
+      "constraint_interaction": "口径版本与聚合粒度双约束",
+      "design_tradeoff": "聚合失败时按全量重算还是增量补算恢复",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L68-119",
+        "metric_compute.py L33-86",
+        "fixtures.py L11-56"
+      ]
+    },
+    {
+      "id": "c02",
+      "topic": "metric_def",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "优化指标缓存策略：口径变更自动失效缓存但正在计算的任务不读半成品",
+      "primary_module": "metric_def",
+      "secondary_modules": [
+        "agg_task",
+        "api_service"
+      ],
+      "data_artifact": "带缓存标记的指标计算结果",
+      "constraint_interaction": "缓存窗口与口径版本同步失效",
+      "design_tradeoff": "缓存按时间窗口还是数据版本管理",
+      "status": "qualified",
+      "source_basis": [
+        "metric_compute.py L89-128",
+        "pipeline_orchestrator.py L68-119"
+      ]
+    },
+    {
+      "id": "c03",
+      "topic": "agg_task",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "聚合任务依赖管理：上游指标就绪检查与输出编排，未就绪不发布空结果",
+      "primary_module": "agg_task",
+      "secondary_modules": [
+        "metric_def",
+        "api_service"
+      ],
+      "data_artifact": "就绪检查后的聚合输出结果",
+      "constraint_interaction": "依赖就绪与发布时机双约束",
+      "design_tradeoff": "依赖检查采用严格全量就绪还是部分可用发布",
+      "status": "qualified",
+      "source_basis": [
+        "metric_compute.py L131-157",
+        "pipeline_orchestrator.py L68-119"
+      ]
+    },
+    {
+      "id": "c04",
+      "topic": "agg_task",
+      "type": "Bugfix",
+      "family": "缺陷修复",
+      "title": "修复聚合重跑覆盖已发布API结果的问题：重算新版本不能覆盖已被下游消费的旧版本",
+      "primary_module": "agg_task",
+      "secondary_modules": [
+        "api_service",
+        "metric_def"
+      ],
+      "data_artifact": "不受覆盖的已发布API结果",
+      "constraint_interaction": "重跑幂等性与已发布版本保护",
+      "design_tradeoff": "重跑采用新建版本还是原地替换",
+      "status": "qualified",
+      "source_basis": [
+        "metric_compute.py L131-157",
+        "pipeline_orchestrator.py L29-41"
+      ]
+    },
+    {
+      "id": "c05",
+      "topic": "dim_registry",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "维度层级校验：注册时验证层级完整性，不完整的维度不能构建立方体",
+      "primary_module": "dim_registry",
+      "secondary_modules": [
+        "cube_builder",
+        "api_service"
+      ],
+      "data_artifact": "经过层级校验的维度记录",
+      "constraint_interaction": "层级完整性与立方体构建依赖",
+      "design_tradeoff": "层级校验在注册时还是构建时执行",
+      "status": "qualified",
+      "source_basis": [
+        "fixtures.py L97-102",
+        "pipeline_orchestrator.py L176-220"
+      ]
+    },
+    {
+      "id": "c06",
+      "topic": "dim_registry",
+      "type": "Bugfix",
+      "family": "缺陷修复",
+      "title": "修复SCD策略未生效致立方体数据漂移：维度变更后已有立方体归属漂移",
+      "primary_module": "dim_registry",
+      "secondary_modules": [
+        "cube_builder",
+        "data_mart"
+      ],
+      "data_artifact": "维度变更历史与立方体一致性检查",
+      "constraint_interaction": "SCD策略与预计算数据一致性",
+      "design_tradeoff": "全量重建还是按影响范围增量修复",
+      "status": "qualified",
+      "source_basis": [
+        "fixtures.py L97-102",
+        "pipeline_orchestrator.py L176-220"
+      ]
+    },
+    {
+      "id": "c07",
+      "topic": "cube_builder",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "多维分组聚合：按维度组合对集市行分组聚合写入API产物",
+      "primary_module": "cube_builder",
+      "secondary_modules": [
+        "dim_registry",
+        "api_service"
+      ],
+      "data_artifact": "分组聚合后的立方体快照",
+      "constraint_interaction": "维度组合与笛卡尔爆炸控制",
+      "design_tradeoff": "预计算所有组合还是按需动态聚合",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L176-220",
+        "fixtures.py L148-154"
+      ]
+    },
+    {
+      "id": "c08",
+      "topic": "cube_builder",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "分片并行聚合：大数据量时分片计算后合并，保证无重复计数",
+      "primary_module": "cube_builder",
+      "secondary_modules": [
+        "data_mart",
+        "api_service"
+      ],
+      "data_artifact": "分片合并后的立方体结果",
+      "constraint_interaction": "分片并行与合并去重双约束",
+      "design_tradeoff": "分片按维度哈希还是数据范围划分",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L192-213",
+        "fixtures.py L148-154"
+      ]
+    },
+    {
+      "id": "c09",
+      "topic": "cohort_rule",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "分群圈选：多条件组合筛选用户生成统计摘要写入报表",
+      "primary_module": "cohort_rule",
+      "secondary_modules": [
+        "data_extract",
+        "report_gen"
+      ],
+      "data_artifact": "分群用户列表与统计摘要",
+      "constraint_interaction": "筛选条件与统计显著性联动",
+      "design_tradeoff": "实时计算还是预计算快照",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L227-270",
+        "fixtures.py L117-128"
+      ]
+    },
+    {
+      "id": "c10",
+      "topic": "cohort_rule",
+      "type": "Bugfix",
+      "family": "缺陷修复",
+      "title": "修复分群规则更新后提取数据未同步：规则变更后需刷新或标记过期",
+      "primary_module": "cohort_rule",
+      "secondary_modules": [
+        "data_extract",
+        "report_gen"
+      ],
+      "data_artifact": "带版本标记的分群提取数据",
+      "constraint_interaction": "规则版本与提取数据版本同步",
+      "design_tradeoff": "自动重提取还是标记过期手动触发",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L227-270",
+        "fixtures.py L117-128"
+      ]
+    },
+    {
+      "id": "c11",
+      "topic": "data_extract",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "分页导出与完整性校验：分页边界不丢不重不遗漏",
+      "primary_module": "data_extract",
+      "secondary_modules": [
+        "cohort_rule",
+        "report_gen"
+      ],
+      "data_artifact": "带校验摘要的提取数据文件",
+      "constraint_interaction": "分页边界与数据变更同时发生",
+      "design_tradeoff": "快照复制还是实时游标分页",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L227-270",
+        "fixtures.py L117-128"
+      ]
+    },
+    {
+      "id": "c12",
+      "topic": "data_extract",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "分片并行导出：多分片独立提取后合并，保证全局排序正确",
+      "primary_module": "data_extract",
+      "secondary_modules": [
+        "report_gen",
+        "data_mart"
+      ],
+      "data_artifact": "多分片合并后的完整数据集",
+      "constraint_interaction": "分片并行与全局排序一致性",
+      "design_tradeoff": "排序在分片前还是合并后执行",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L227-270",
+        "fixtures.py L148-154"
+      ]
+    },
+    {
+      "id": "c13",
+      "topic": "trend_series",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "缺失值填充与异常检测：填充时序缺口标记异常点供预测消费",
+      "primary_module": "trend_series",
+      "secondary_modules": [
+        "forecast",
+        "quality_mon"
+      ],
+      "data_artifact": "填充后的完整时序数据",
+      "constraint_interaction": "填充策略与预测准确性相互影响",
+      "design_tradeoff": "线性插值还是前值填充",
+      "status": "qualified",
+      "source_basis": [
+        "fixtures.py L61-92",
+        "forecast_engine.py L32-57"
+      ]
+    },
+    {
+      "id": "c14",
+      "topic": "trend_series",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "多指标并行查询存储优化：宽表/竖表结构选择",
+      "primary_module": "trend_series",
+      "secondary_modules": [
+        "forecast",
+        "report_gen"
+      ],
+      "data_artifact": "多指标联合查询视图",
+      "constraint_interaction": "存储结构与查询性能双约束",
+      "design_tradeoff": "宽表还是竖表EAV存储",
+      "status": "qualified",
+      "source_basis": [
+        "fixtures.py L61-92",
+        "forecast_engine.py L110-145"
+      ]
+    },
+    {
+      "id": "c15",
+      "topic": "forecast",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "多算法预测对比：线性趋势移动平均指数平滑并输出评估",
+      "primary_module": "forecast",
+      "secondary_modules": [
+        "trend_series",
+        "report_gen"
+      ],
+      "data_artifact": "多算法预测结果与指标",
+      "constraint_interaction": "算法选择与预测周期相互制约",
+      "design_tradeoff": "自动选择还是用户指定算法",
+      "status": "qualified",
+      "source_basis": [
+        "forecast_engine.py L32-157",
+        "fixtures.py L61-92"
+      ]
+    },
+    {
+      "id": "c16",
+      "topic": "forecast",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "多指标模型评估：MAPE/MSE/R2全覆盖评估",
+      "primary_module": "forecast",
+      "secondary_modules": [
+        "trend_series",
+        "report_gen"
+      ],
+      "data_artifact": "模型评估指标报告",
+      "constraint_interaction": "评估指标选择与可靠性判断",
+      "design_tradeoff": "滚动回测还是固定训练集",
+      "status": "qualified",
+      "source_basis": [
+        "forecast_engine.py L56-107",
+        "forecast_engine.py L32-57"
+      ]
+    },
+    {
+      "id": "c17",
+      "topic": "experiment",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "AB实验z检验与Cohen's h效应量计算并写入集市",
+      "primary_module": "experiment",
+      "secondary_modules": [
+        "stat_model",
+        "data_mart"
+      ],
+      "data_artifact": "统计检验结果与效应量",
+      "constraint_interaction": "样本量与显著性水平双约束",
+      "design_tradeoff": "固定样本还是序贯检验",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L277-338",
+        "fixtures.py L107-112"
+      ]
+    },
+    {
+      "id": "c18",
+      "topic": "experiment",
+      "type": "Bugfix",
+      "family": "缺陷修复",
+      "title": "修复不等样本量检验偏差：样本不均时Cohen's h估计偏高",
+      "primary_module": "experiment",
+      "secondary_modules": [
+        "stat_model",
+        "data_mart"
+      ],
+      "data_artifact": "修正后的统计检验结果",
+      "constraint_interaction": "样本不均与效应量估计相互影响",
+      "design_tradeoff": "加权调整还是重采样",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L292-300",
+        "fixtures.py L107-112"
+      ]
+    },
+    {
+      "id": "c19",
+      "topic": "stat_model",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "拟合优度评估与残差检验",
+      "primary_module": "stat_model",
+      "secondary_modules": [
+        "experiment",
+        "data_mart"
+      ],
+      "data_artifact": "拟合优度与残差分布",
+      "constraint_interaction": "拟合优度与样本区间分布差异",
+      "design_tradeoff": "图形化还是统计检验",
+      "status": "qualified",
+      "source_basis": [
+        "forecast_engine.py L32-57",
+        "pipeline_orchestrator.py L277-338"
+      ]
+    },
+    {
+      "id": "c20",
+      "topic": "stat_model",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "多实验对比与多重比较校正：Bonferroni/FDR选择",
+      "primary_module": "stat_model",
+      "secondary_modules": [
+        "compare_job",
+        "report_gen"
+      ],
+      "data_artifact": "多实验效应量对比报告",
+      "constraint_interaction": "多重比较增加第一类错误",
+      "design_tradeoff": "Bonferroni还是FDR校正",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L277-338",
+        "fixtures.py L107-112"
+      ]
+    },
+    {
+      "id": "c21",
+      "topic": "attribution",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "多触点归因：首次末次线性三种模型计算触点权重",
+      "primary_module": "attribution",
+      "secondary_modules": [
+        "metric_def",
+        "compare_job"
+      ],
+      "data_artifact": "三种归因模型权重与对比",
+      "constraint_interaction": "归因窗口与触点过滤双约束",
+      "design_tradeoff": "固定天数还是按活跃周期确定窗口",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L399-480",
+        "fixtures.py L133-143"
+      ]
+    },
+    {
+      "id": "c22",
+      "topic": "attribution",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "归因权重归一化：跨用户触点数不同时权重可比性",
+      "primary_module": "attribution",
+      "secondary_modules": [
+        "compare_job",
+        "metric_def"
+      ],
+      "data_artifact": "归一化后的归因权重",
+      "constraint_interaction": "归一化方法与跨用户可比性",
+      "design_tradeoff": "触点级还是用户级归一化",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L441-459",
+        "fixtures.py L133-143"
+      ]
+    },
+    {
+      "id": "c23",
+      "topic": "compare_job",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "数据对比差异检测：绝对/相对偏差选择",
+      "primary_module": "compare_job",
+      "secondary_modules": [
+        "attribution",
+        "metric_def"
+      ],
+      "data_artifact": "归因模型差异对比表",
+      "constraint_interaction": "差异阈值与误报率平衡",
+      "design_tradeoff": "绝对偏差还是相对偏差",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L462-473",
+        "fixtures.py L133-143"
+      ]
+    },
+    {
+      "id": "c24",
+      "topic": "compare_job",
+      "type": "Bugfix",
+      "family": "缺陷修复",
+      "title": "修复零值除零错误导致无效差异",
+      "primary_module": "compare_job",
+      "secondary_modules": [
+        "attribution",
+        "report_gen"
+      ],
+      "data_artifact": "修正后的对比结果",
+      "constraint_interaction": "零值处理与差异显著性",
+      "design_tradeoff": "绝对差异还是标记不可比",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L462-473",
+        "fixtures.py L133-143"
+      ]
+    },
+    {
+      "id": "c25",
+      "topic": "report_gen",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "多数据源报表整合：预测分群实验三源综合",
+      "primary_module": "report_gen",
+      "secondary_modules": [
+        "forecast",
+        "cohort_rule"
+      ],
+      "data_artifact": "多来源综合报表",
+      "constraint_interaction": "多源时间对齐与统一口径",
+      "design_tradeoff": "统一周期还是保留原始粒度",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L121-168",
+        "pipeline_orchestrator.py L227-270"
+      ]
+    },
+    {
+      "id": "c26",
+      "topic": "report_gen",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "报表多渠道分发与增量更新",
+      "primary_module": "report_gen",
+      "secondary_modules": [
+        "data_extract",
+        "api_service"
+      ],
+      "data_artifact": "多渠道分发记录",
+      "constraint_interaction": "分发时机与数据新鲜度",
+      "design_tradeoff": "推送还是拉取模式",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L68-119",
+        "pipeline_orchestrator.py L227-270"
+      ]
+    },
+    {
+      "id": "c27",
+      "topic": "data_mart",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "实验统计自动入库与去重",
+      "primary_module": "data_mart",
+      "secondary_modules": [
+        "experiment",
+        "stat_model"
+      ],
+      "data_artifact": "实验统计入库行",
+      "constraint_interaction": "自动写入与手动管理一致性",
+      "design_tradeoff": "追加还是覆盖更新",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L319-331",
+        "fixtures.py L148-154"
+      ]
+    },
+    {
+      "id": "c28",
+      "topic": "data_mart",
+      "type": "Bugfix",
+      "family": "缺陷修复",
+      "title": "修复流水线重复执行产生重复行",
+      "primary_module": "data_mart",
+      "secondary_modules": [
+        "experiment",
+        "stat_model"
+      ],
+      "data_artifact": "去重后的集市行",
+      "constraint_interaction": "幂等性与数据更新冲突",
+      "design_tradeoff": "完全幂等跳过还是允许覆盖",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L319-331",
+        "pipeline_orchestrator.py L29-41"
+      ]
+    },
+    {
+      "id": "c29",
+      "topic": "api_service",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "多版本查询与缓存管理",
+      "primary_module": "api_service",
+      "secondary_modules": [
+        "agg_task",
+        "cube_builder"
+      ],
+      "data_artifact": "带版本标记的API结果",
+      "constraint_interaction": "缓存过期与版本更新同步",
+      "design_tradeoff": "TTL还是版本号驱动失效",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L215-220",
+        "pipeline_orchestrator.py L112-119"
+      ]
+    },
+    {
+      "id": "c30",
+      "topic": "api_service",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "QPS限流与背压处理",
+      "primary_module": "api_service",
+      "secondary_modules": [
+        "agg_task",
+        "metric_def"
+      ],
+      "data_artifact": "带QPS监控的服务日志",
+      "constraint_interaction": "限流与计算进行中一致性",
+      "design_tradeoff": "令牌桶还是滑动窗口",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L68-119",
+        "metric_compute.py L131-157"
+      ]
+    },
+    {
+      "id": "c31",
+      "topic": "quality_mon",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "跨模块质量扫描：自动检测各模块数据异常",
+      "primary_module": "quality_mon",
+      "secondary_modules": [
+        "agg_task",
+        "experiment"
+      ],
+      "data_artifact": "跨模块异常清单与评分",
+      "constraint_interaction": "扫描范围与性能影响",
+      "design_tradeoff": "定时全量还是事件增量",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L345-393",
+        "fixtures.py L159-164"
+      ]
+    },
+    {
+      "id": "c32",
+      "topic": "quality_mon",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "加权评分与趋势分析",
+      "primary_module": "quality_mon",
+      "secondary_modules": [
+        "data_mart",
+        "report_gen"
+      ],
+      "data_artifact": "加权质量评分与趋势",
+      "constraint_interaction": "评分权重与异常类型差异",
+      "design_tradeoff": "固定权重还是动态调整",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L345-393",
+        "fixtures.py L159-164"
+      ]
+    },
+    {
+      "id": "c33",
+      "topic": "pipeline_orch",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "管道批量执行与结果汇总",
+      "primary_module": "pipeline_orch",
+      "secondary_modules": [
+        "store",
+        "api_service"
+      ],
+      "data_artifact": "全部管道执行摘要",
+      "constraint_interaction": "执行顺序与结果依赖",
+      "design_tradeoff": "顺序还是DAG拓扑",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L487-501"
+      ]
+    },
+    {
+      "id": "c34",
+      "topic": "metric_compute",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "趋势特征计算：同比环比变异系数",
+      "primary_module": "metric_compute",
+      "secondary_modules": [
+        "trend_series",
+        "report_gen"
+      ],
+      "data_artifact": "趋势特征报告",
+      "constraint_interaction": "趋势信号冲突的判断",
+      "design_tradeoff": "单指标还是多指标投票",
+      "status": "qualified",
+      "source_basis": [
+        "metric_compute.py L89-128",
+        "fixtures.py L61-92"
+      ]
+    },
+    {
+      "id": "c35",
+      "topic": "forecast_engine",
+      "type": "功能优化",
+      "family": "优化",
+      "title": "算法自适应选择与评估",
+      "primary_module": "forecast_engine",
+      "secondary_modules": [
+        "trend_series",
+        "report_gen"
+      ],
+      "data_artifact": "自适应预测评估报告",
+      "constraint_interaction": "算法选择与数据特征匹配",
+      "design_tradeoff": "自动还是手动选择",
+      "status": "qualified",
+      "source_basis": [
+        "forecast_engine.py L110-145",
+        "fixtures.py L61-92"
+      ]
+    },
+    {
+      "id": "c36",
+      "topic": "seed_store",
+      "type": "代码重构",
+      "family": "重构",
+      "title": "抽象存储接口支持多后端",
+      "primary_module": "store",
+      "secondary_modules": [
+        "fixtures",
+        "pipeline_orch"
+      ],
+      "data_artifact": "保持行为不变的抽象接口",
+      "constraint_interaction": "抽象层不能引入查询延迟",
+      "design_tradeoff": "面向接口还是策略模式",
+      "status": "qualified",
+      "source_basis": [
+        "store.py L1-56",
+        "fixtures.py L169-178"
+      ]
+    },
+    {
+      "id": "c37",
+      "topic": "cross_cutting",
+      "type": "依赖升级与迁移",
+      "family": "迁移",
+      "title": "管道结果版本管理迁移：结构化版本兼容旧格式",
+      "primary_module": "pipeline_orch",
+      "secondary_modules": [
+        "store",
+        "api_service"
+      ],
+      "data_artifact": "版本化管道结果存储",
+      "constraint_interaction": "迁移兼容性与新功能字段",
+      "design_tradeoff": "在线升级还是停机迁移",
+      "status": "qualified",
+      "source_basis": [
+        "pipeline_orchestrator.py L29-47"
+      ]
+    },
+    {
+      "id": "c38",
+      "topic": "segmentation",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "数据切片生命周期管理",
+      "primary_module": "segmentation",
+      "secondary_modules": [
+        "data_mart"
+      ],
+      "data_artifact": "归档记录",
+      "status": "reserve",
+      "reason": "单一模块数据流"
+    },
+    {
+      "id": "c39",
+      "topic": "schedule_plan",
+      "type": "功能开发",
+      "family": "新增能力",
+      "title": "调度计划级联触发",
+      "primary_module": "schedule_plan",
+      "secondary_modules": [
+        "agg_task"
+      ],
+      "data_artifact": "执行记录",
+      "status": "reserve",
+      "reason": "与管道编排重复"
+    },
+    {
+      "id": "c40",
+      "topic": "data_extract",
+      "type": "Bugfix",
+      "family": "缺陷修复",
+      "title": "排序与分页边界",
+      "primary_module": "data_extract",
+      "secondary_modules": [
+        "cohort_rule"
+      ],
+      "data_artifact": "排序结果",
+      "status": "eliminated",
+      "reason": "与c11/c12重复"
+    },
+    {
+      "id": "c41",
+      "topic": "trend_series",
+      "type": "Bugfix",
+      "family": "缺陷修复",
+      "title": "日期格式解析",
+      "primary_module": "trend_series",
+      "secondary_modules": [
+        "forecast"
+      ],
+      "data_artifact": "日期解析",
+      "status": "eliminated",
+      "reason": "简单字段修复"
+    },
+    {
+      "id": "c42",
+      "topic": "cross_cutting",
+      "type": "代码重构",
+      "family": "重构",
+      "title": "种子数据模块化",
+      "primary_module": "seed",
+      "secondary_modules": [
+        "store"
+      ],
+      "data_artifact": "模块化加载",
+      "status": "eliminated",
+      "reason": "与c36重复"
+    }
+  ]
+}
