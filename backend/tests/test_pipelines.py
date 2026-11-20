@@ -21,10 +21,17 @@ class TestMetricAggPipeline:
     """Pipeline 1: metric_def -> agg_task -> api_service"""
 
     def test_gmv_aggregation(self):
+        # 聚合只认已发布口径：METR-GMV 在种子数据里是草稿，先发布
+        for row in store.rows("metric_def"):
+            if row.get("指标编号") == "METR-GMV":
+                row["status"] = "已发布"
         result = run_metric_agg_pipeline("METR-GMV")
         assert result["metric_code"] == "METR-GMV"
         assert result["unit"] == "元"
         assert result["point_count"] == 30
+        # 结果必须携带计算时的编号、公式与精度快照
+        assert result["metric_spec"]["计算公式"] == "sum(order_amount)"
+        assert result["metric_spec"]["精度位数"] == 2
         # 30 天 GMV 总和应为已知 fixtures 之和
         expected = 124500.0 + 138200.0 + 119800.0 + 145600.0 + 152300.0 + 160100.0 + 175400.0 + 168900.0 + 155200.0 + 142000.0 + 149500.0 + 161200.0 + 173800.0 + 182000.0 + 190500.0 + 178300.0 + 165000.0 + 158400.0 + 171200.0 + 185000.0 + 192300.0 + 201000.0 + 210500.0 + 198000.0 + 205400.0 + 218000.0 + 225600.0 + 232000.0 + 221000.0 + 238500.0
         assert result["value"] == round(expected, 2)
@@ -37,6 +44,10 @@ class TestMetricAggPipeline:
         assert 0.0 < result["value"] <= 1.0
 
     def test_pipeline_result_written(self):
+        # METR-UV 在种子数据里是「已审核」，聚合只认已发布口径，先发布再计算
+        for row in store.rows("metric_def"):
+            if row.get("指标编号") == "METR-UV":
+                row["status"] = "已发布"
         run_metric_agg_pipeline("METR-UV")
         results = list_pipeline_results()
         ids = [r["pipeline_id"] for r in results]

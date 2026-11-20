@@ -35,6 +35,9 @@ def trigger_metric_agg(
     metric_code: str | None = Query(default=None, description="指标编号，如 METR-GMV"),
 ) -> ActionResult:
     result = run_metric_agg_pipeline(metric_code)
+    # 编号查不到/未发布/公式出错时不落库，明确告知调用方，且保留上一次合法结果
+    if "error" in result:
+        return ActionResult(ok=False, message=result["error"], entry=result)
     return ActionResult(ok=True, message="指标聚合管道已执行", entry=result)
 
 

@@ -16,10 +16,10 @@ from app.fixtures import (
     DATA_MART_ROWS,
     DIMENSIONS,
     EXPERIMENT_RESULTS,
-    METRIC_DEFS,
     QUALITY_CHECK_SAMPLES,
     TREND_POINTS,
 )
+from app.services.metric_compute import compute_metric
 from app.store import store
 
 # ---------------------------------------------------------------------------
@@ -65,57 +65,117 @@ def _to_int(val: Any) -> int:
 # Pipeline 1: metric_def -> agg_task -> api_service
 # ---------------------------------------------------------------------------
 
-def run_metric_agg_pipeline(metric_code: str | None = None) -> dict[str, Any]:
-    """读取指标定义与 fixtures 时序数据，按口径执行真实聚合，生成 API 产物。"""
-    # 取指标定义（优先 fixture，再回退 store）
-    defs = METRIC_DEFS
-    if metric_code is None:
-        target = defs[0]
-    else:
-        target = next((d for d in defs if d.get("指标编号") == metric_code), defs[0])
+METRIC_AGG_PIPELINE_ID = "metric_agg_api"
 
-    formula = target.get("计算公式", "")
-    granularity = target.get("聚合粒度", "日")
 
-    points = list(TREND_POINTS)
-    result: dict[str, Any] = {"metric_code": target.get("指标编号"), "granularity": granularity}
+def _next_metric_agg_seq() -> int:
+    table = store.rows("_pipeline_results")
+    for row in table:
+        if row.get("pipeline_id") == METRIC_AGG_PIPELINE_ID:
+            return int(row.get("latest_seq", 0)) + 1
+    return 1
 
-    if "sum(order_amount)" in formula or "gmv" in target.get("指标名称", "").lower():
-        total = sum(p["gmv"] for p in points)
-        result["value"] = round(total, _to_int(target.get("精度位数", 2)))
-        result["unit"] = "元"
-        result["point_count"] = len(points)
-    elif "count(distinct user_id)" in formula or "uv" in target.get("指标名称", "").lower():
-        total = sum(p["uv"] for p in points)
-        result["value"] = total
-        result["unit"] = "人"
-        result["point_count"] = len(points)
-    elif "paid_uv / total_uv" in formula or "转化率" in target.get("指标名称", ""):
-        total_paid = sum(p["paid_uv"] for p in points)
-        total_uv = sum(p["total_uv"] for p in points)
-        cvr = total_paid / total_uv if total_uv else 0.0
-        result["value"] = round(cvr, _to_int(target.get("精度位数", 4)))
-        result["unit"] = "比率"
-        result["point_count"] = len(points)
-    elif "gmv / uv" in formula or "平均收入" in target.get("指标名称", ""):
-        total_gmv = sum(p["gmv"] for p in points)
-        total_uv = sum(p["uv"] for p in points)
-        arpu = total_gmv / total_uv if total_uv else 0.0
-        result["value"] = round(arpu, _to_int(target.get("精度位数", 2)))
-        result["unit"] = "元/人"
-        result["point_count"] = len(points)
-    else:
-        result["value"] = 0.0
-        result["unit"] = "未知"
-        result["point_count"] = 0
 
-    # 写入 agg_task 与 api_service 可读产物
-    _write_result("metric_agg_api", {
+def _write_metric_agg_result(result: dict[str, Any], spec: dict[str, Any]) -> dict[str, Any]:
+    """把一次合法聚合结果以版本化、可核对的方式落库。
+
+    - 历史记录只追加（history），同编号的老口径结果永不覆盖，支持报表核对老数据；
+    - latest_by_metric 记录每个编号当前生效的版本，口径发布与聚合写入并发时
+      读到的也是某次完整运行的快照，不会出现半新半旧的结果；
+    - 调用方只有在计算成功（拿到 value 与口径快照）后才会进入本函数，
+      查不到编号或计算出错直接返回，不会触碰既有记录。
+    """
+    table = store.rows("_pipeline_results")
+    seq = _next_metric_agg_seq()
+    run_record = {
+        "run_seq": seq,
+        "metric_code": result["metric_code"],
+        "value": result["value"],
+        "unit": result.get("unit"),
+        "granularity": result.get("granularity"),
+        "point_count": result.get("point_count"),
+        "metric_spec": dict(spec),
+        "ran_at": datetime.now().isoformat(),
+        "compute": dict(result),
+    }
+
+    for row in table:
+        if row.get("pipeline_id") == METRIC_AGG_PIPELINE_ID:
+            history = row.setdefault("history", [])
+            history.append(run_record)
+            latest = row.setdefault("latest_by_metric", {})
+            latest[result["metric_code"]] = dict(run_record)
+            row["payload"] = dict(result)
+            row["latest_seq"] = seq
+            row["updated_at"] = run_record["ran_at"]
+            return run_record
+
+    entry = {
+        "pipeline_id": METRIC_AGG_PIPELINE_ID,
         "source_modules": ["metric_def", "agg_task"],
         "target_module": "api_service",
-        "payload": result,
-    })
-    return result
+        "created_at": run_record["ran_at"],
+        "updated_at": run_record["ran_at"],
+        "latest_seq": seq,
+        "payload": dict(result),
+        "latest_by_metric": {result["metric_code"]: dict(run_record)},
+        "history": [run_record],
+    }
+    table.append(entry)
+    return run_record
+
+
+def get_metric_agg_record(metric_code: str, caliber_version: str | None = None) -> dict[str, Any] | None:
+    """读取某指标编号已落库的聚合结果。
+
+    默认返回该编号最近一次合法运行；指定口径版本时返回对应历史版本。
+    数据服务据此提供「结果附带的口径」，而不是用当前定义重新解释旧值。
+    """
+    for row in store.rows("_pipeline_results"):
+        if row.get("pipeline_id") != METRIC_AGG_PIPELINE_ID:
+            continue
+        if caliber_version is not None:
+            for record in reversed(row.get("history", [])):
+                spec = record.get("metric_spec", {})
+                if record.get("metric_code") == metric_code and spec.get("口径版本") == caliber_version:
+                    return dict(record)
+            return None
+        latest = row.get("latest_by_metric", {})
+        record = latest.get(metric_code)
+        return dict(record) if record is not None else None
+    return None
+
+
+def run_metric_agg_pipeline(metric_code: str | None = None) -> dict[str, Any]:
+    """按已发布的指标定义执行聚合，生成供数据服务消费的版本化产物。
+
+    与旧实现的关键差异：
+    - 定义只从 store 的「已发布」指标读取，不再使用 fixtures 示例定义；
+    - 未显式给编号时取当前已发布列表的第一条（同样不回退到示例）；
+    - 编号不存在/未发布/公式不支持时直接返回 error，不执行任何写入，
+      因此上一次真正的计算值不会被默认指标或占位值覆盖；
+    - 每次成功运行都把指标编号、公式、精度、口径版本随结果一起保留，
+      历史版本追加存档，后续报表仍可核对老口径数据。
+    """
+    if metric_code is None:
+        published = [
+            str(row.get("指标编号"))
+            for row in store.rows("metric_def")
+            if row.get("status") == "已发布" and row.get("指标编号")
+        ]
+        if not published:
+            return {"error": "当前没有已发布的指标定义，聚合任务无可用口径，已跳过本次写入"}
+        metric_code = published[0]
+
+    result = compute_metric(metric_code)
+    if "error" in result:
+        # 不写 _pipeline_results：保留 history / latest_by_metric 中上一次的合法结果
+        return result
+
+    spec = result["metric_spec"]
+    run_record = _write_metric_agg_result(result, spec)
+    # 管道运行详情需要能对照实际生效的版本与值，把运行记录一并透出
+    return {**dict(result), "run": run_record}
 
 
 # ---------------------------------------------------------------------------

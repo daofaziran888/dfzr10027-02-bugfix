@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from app.schemas import ActionPayload, ActionResult, EntryPayload, PageResult
 from app.services.api_service import ApiServiceService
+from app.services.pipeline_orchestrator import get_metric_agg_record
 
 router = APIRouter(prefix="/api/api_service", tags=["数据服务"])
 
@@ -65,6 +66,45 @@ def export_entries(
         headers={"Content-Disposition": 'attachment; filename="api_service.csv"'})
 
 
+@router.get("/metric-value/{metric_code}", response_model=dict)
+def get_metric_value(
+    metric_code: str,
+    caliber_version: str | None = Query(default=None, description="口径版本，缺省返回该编号最近一次合法聚合结果"),
+) -> dict:
+    """数据服务对外提供指标查询值。
+
+    值与口径（指标编号、计算公式、精度位数、口径版本）都取自聚合落库时附带的
+    快照，而不是读取当前指标定义后给历史值重新贴标签；指定已发布过的老口径
+    版本时，仍能取到当时可核对的老数据。没有任何成功聚合记录时返回 404。
+    """
+    record = get_metric_agg_record(metric_code, caliber_version)
+    if record is None:
+        detail = (
+            f"指标 {metric_code} 口径版本 {caliber_version} 暂无聚合结果"
+            if caliber_version is not None
+            else f"指标 {metric_code} 暂无成功聚合结果"
+        )
+        raise HTTPException(status_code=404, detail=detail)
+    spec = record.get("metric_spec", {})
+    return {
+        "metric_code": record.get("metric_code"),
+        "value": record.get("value"),
+        "unit": record.get("unit"),
+        "granularity": record.get("granularity"),
+        "point_count": record.get("point_count"),
+        "caliber": {
+            "指标编号": spec.get("指标编号"),
+            "计算公式": spec.get("计算公式"),
+            "精度位数": spec.get("精度位数"),
+            "口径版本": spec.get("口径版本"),
+            "聚合粒度": spec.get("聚合粒度"),
+            "数据来源": spec.get("数据来源"),
+        },
+        "run_seq": record.get("run_seq"),
+        "ran_at": record.get("ran_at"),
+    }
+
+
 @router.get("/{entry_id}", response_model=dict)
 def get_entry(entry_id: int) -> dict:
     """读取单条服务接口明细；不存在时给出可读的错误说明。"""
@@ -75,9 +115,9 @@ def get_entry(entry_id: int) -> dict:
 
 
 @router.post("", response_model=ActionResult)
-def create_entry(payload: dict[str, object]) -> ActionResult:
+def create_entry(payload: EntryPayload) -> ActionResult:
     """登记一条服务接口，缺字段时说明原因而不是静默丢弃。"""
-    entry, missing = service.create_entry(payload)
+    entry, missing = service.create_entry(payload.values)
     if missing:
         return ActionResult(ok=False, message=f"缺少必填字段：{'、'.join(missing)}")
     return ActionResult(ok=True, message="服务接口已登记", entry=entry)
